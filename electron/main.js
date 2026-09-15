@@ -25,6 +25,9 @@ let isProgrammaticResize = false;
 
 function createWindow() {
   const preloadPath = fileURLToPath(new URL("preload.js", import.meta.url));
+  const iconPath = app.isPackaged
+    ? fileURLToPath(new URL("../dist/pet/icon.png", import.meta.url))
+    : fileURLToPath(new URL("../public/pet/icon.png", import.meta.url));
 
   if (process.platform === "win32") {
     app.commandLine.appendSwitch("disable-features", "WinUseBrowserSpellChecker");
@@ -41,6 +44,7 @@ function createWindow() {
     transparent: true,
     alwaysOnTop: true,
     resizable: false,
+    icon: iconPath,
     hasShadow: false,
     thickFrame: false,
     webPreferences: {

@@ -62,7 +62,7 @@
         "AppImage",
         "pacman"
       ],
-      "icon": "build/icon.png"
+      "icon": "public/pet/icon.png"
     }
   }
 }
