@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 
-type AutoState = "idle" | "walk" | "fastrun" | "sleep" | "eating" | "work" | "roar";
+type AutoState = "idle" | "walk" | "fastrun" | "sleep" | "eating" | "work" | "roar" | "petting";
 const isEmotionMenu = new URLSearchParams(window.location.search).get("window") === "emotion-menu";
 const isSettingsWindow = new URLSearchParams(window.location.search).get("window") === "settings";
+const cursorHotspots = {
+  "hand1.png": { x: 130, y: 65 },
+  "hand2.png": { x: 125, y: 58 },
+} as const;
 const emotions = [
   { value: "feed", label: "🍖", ariaLabel: "밥주기" },
   { value: "work", label: "💻", ariaLabel: "작업" },
@@ -28,6 +32,7 @@ declare global {
       closeSettings: () => void;
       setPetScale: (scale: number) => void;
       setBorderEnabled: (enabled: boolean) => void;
+      setPettingMode: (enabled: boolean) => void;
       onPetScaleChanged: (callback: (scale: number) => void) => () => void;
       onBorderEnabledChanged: (callback: (enabled: boolean) => void) => () => void;
       onEmotionSelected: (callback: (emotion: string) => void) => () => void;
@@ -38,7 +43,7 @@ declare global {
 
 function SettingsWindow() {
   const initialScale = Number(new URLSearchParams(window.location.search).get("scale")) || 1;
-  const initialBorderEnabled = new URLSearchParams(window.location.search).get("border") !== "false";
+  const initialBorderEnabled = new URLSearchParams(window.location.search).get("border") === "true";
   const [scale, setScale] = useState(initialScale);
   const [borderEnabled, setBorderEnabled] = useState(initialBorderEnabled);
 
@@ -143,8 +148,10 @@ function Pet() {
   const [eatingFrame, setEatingFrame] = useState(0);
   const [workFrame, setWorkFrame] = useState(0);
   const [roarFrame, setRoarFrame] = useState(0);
+  const [isPettingHeld, setIsPettingHeld] = useState(false);
+  const [pettingFrame, setPettingFrame] = useState(1);
   const [petScale, setPetScale] = useState(1);
-  const [borderEnabled, setBorderEnabled] = useState(true);
+  const [borderEnabled, setBorderEnabled] = useState(false);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const positionRef = useRef({ x: -1, y: -1 });
   const autoStateRef = useRef<AutoState>("idle");
@@ -155,10 +162,59 @@ function Pet() {
   const menuOpenedFromWorkRef = useRef(false);
   const emotionSelectedRef = useRef(false);
   const sleepClickTimesRef = useRef<number[]>([]);
+  const pettingMotionIndexRef = useRef(0);
+  const lastPettingMoveRef = useRef(0);
+  const pettingStopTimerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     autoStateRef.current = autoState;
   }, [autoState]);
+
+  useEffect(() => {
+    window.electronAPI.setPettingMode(autoState === "petting");
+  }, [autoState]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const isPetting = autoState === "petting";
+    const cursorFile = isPettingHeld ? "hand2.png" : "hand1.png";
+    root.classList.toggle("petting-cursor", isPetting);
+    root.classList.toggle("petting-held", isPetting && isPettingHeld);
+    root.classList.toggle("petting-held-alt", isPetting && isPettingHeld);
+    const setCursor = (cursor: string) => {
+      root.style.cursor = cursor;
+      document.body.style.cursor = cursor;
+      document.getElementById("root")?.style.setProperty("cursor", cursor);
+    };
+    setCursor(isPetting ? "pointer" : "");
+
+    let cancelled = false;
+    if (isPetting) {
+      const image = new Image();
+      image.onload = () => {
+        if (cancelled) return;
+
+        const cursorScale = petScale * 0.15;
+        const width = Math.max(1, Math.round(image.naturalWidth * cursorScale));
+        const height = Math.max(1, Math.round(image.naturalHeight * cursorScale));
+        const hotspot = cursorHotspots[cursorFile as keyof typeof cursorHotspots];
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")?.drawImage(image, 0, 0, width, height);
+        setCursor(`url("${canvas.toDataURL("image/png")}") ${Math.round(hotspot.x * cursorScale)} ${Math.round(hotspot.y * cursorScale)}, pointer`);
+      };
+      image.src = `${import.meta.env.BASE_URL}pet/${cursorFile}`;
+    }
+
+    return () => {
+      cancelled = true;
+      root.classList.remove("petting-cursor", "petting-held", "petting-held-alt");
+      root.style.cursor = "";
+      document.body.style.cursor = "";
+      document.getElementById("root")?.style.removeProperty("cursor");
+    };
+  }, [autoState, isPettingHeld, petScale]);
 
   const onPetMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (autoState === "fastrun") {
@@ -168,6 +224,12 @@ function Pet() {
 
     if (autoState === "eating") {
       e.preventDefault();
+      return;
+    }
+
+    if (autoState === "petting" && e.button === 0) {
+      e.preventDefault();
+      setIsPettingHeld(true);
       return;
     }
 
@@ -208,6 +270,25 @@ function Pet() {
     window.electronAPI.startDrag(direction, e.screenX, e.screenY);
   };
 
+  const onPetMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (autoState !== "petting" || e.buttons !== 0) return;
+
+    const now = Date.now();
+    if (now - lastPettingMoveRef.current < 150) return;
+    lastPettingMoveRef.current = now;
+
+    const nextFrame = pettingMotionIndexRef.current;
+    pettingMotionIndexRef.current = (nextFrame + 1) % 3;
+    setPettingFrame(nextFrame);
+    if (pettingStopTimerRef.current !== undefined) {
+      window.clearTimeout(pettingStopTimerRef.current);
+    }
+    pettingStopTimerRef.current = window.setTimeout(() => {
+      pettingMotionIndexRef.current = 1;
+      setPettingFrame(1);
+    }, 450);
+  };
+
   useEffect(() => {
     if (!isHolding) return;
 
@@ -243,6 +324,26 @@ function Pet() {
   }, [isHolding]);
 
   useEffect(() => {
+    if (autoState !== "petting") return;
+
+    const onMouseUp = () => {
+      setIsPettingHeld(false);
+      setPettingFrame(1);
+    };
+
+    window.addEventListener("mouseup", onMouseUp);
+    return () => window.removeEventListener("mouseup", onMouseUp);
+  }, [autoState]);
+
+  useEffect(() => {
+    return () => {
+      if (pettingStopTimerRef.current !== undefined) {
+        window.clearTimeout(pettingStopTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const removeBoundaryListener = window.electronAPI.onAutoBoundary(() => {
       if (!isHoldingRef.current && !isEmotionMenuOpen) {
         setDirection((currentDirection) => currentDirection === 1 ? -1 : 1);
@@ -267,11 +368,16 @@ function Pet() {
       emotionSelectedRef.current = true;
       setIsEmotionMenuOpen(false);
       setIsHolding(false);
+      setIsPettingHeld(false);
       if (emotion === "feed") {
         setEatingFrame(0);
         setAutoState("eating");
       } else if (emotion === "work") {
         setAutoState("work");
+      } else if (emotion === "love") {
+        pettingMotionIndexRef.current = 0;
+        setPettingFrame(1);
+        setAutoState("petting");
       } else {
         setAutoState("idle");
       }
@@ -298,7 +404,7 @@ function Pet() {
   }, []);
 
   useEffect(() => {
-    if (isHolding || isHoldingRef.current || isEmotionMenuOpen || autoState === "sleep" || autoState === "eating" || autoState === "work" || autoState === "roar") return;
+    if (isHolding || isHoldingRef.current || isEmotionMenuOpen || autoState === "sleep" || autoState === "eating" || autoState === "work" || autoState === "roar" || autoState === "petting") return;
 
     const duration = autoState === "idle"
       ? 1000 + Math.random() * 2000
@@ -494,6 +600,8 @@ function Pet() {
       ? `${import.meta.env.BASE_URL}pet/roar${roarFrame + 1}.png`
       : autoState === "work"
       ? `${import.meta.env.BASE_URL}pet/neptop${workFrame + 1}.png`
+      : autoState === "petting"
+      ? `${import.meta.env.BASE_URL}pet/${isPettingHeld ? "petting4.png" : pettingFrame === 0 ? "petting1.png" : pettingFrame === 1 ? "petting2.png" : "petting3.png"}`
       : autoState === "fastrun"
       ? `${import.meta.env.BASE_URL}pet/fastrun${fastRunFrame + 1}.png`
       : autoState === "walk"
@@ -501,7 +609,12 @@ function Pet() {
       : `${import.meta.env.BASE_URL}pet/idle.png`;
   return (
     // 💡 .pet div 자체에 grab 커서가 먹히도록 설정 (CSS에서 세팅)
-    <div className={`pet${borderEnabled ? "" : " no-border"}`} onMouseDown={onPetMouseDown} onContextMenu={(e) => e.preventDefault()}>
+    <div
+      className={`pet${borderEnabled ? "" : " no-border"}`}
+      onMouseDown={onPetMouseDown}
+      onMouseMove={onPetMouseMove}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <img
         src={sprite}
         alt="pet"

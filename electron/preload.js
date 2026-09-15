@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   closeSettings: () => ipcRenderer.send("pet:close-settings"),
   setPetScale: (scale) => ipcRenderer.send("pet:set-scale", scale),
   setBorderEnabled: (enabled) => ipcRenderer.send("pet:set-border-enabled", enabled),
+  setPettingMode: (enabled) => ipcRenderer.send("pet:set-petting-mode", enabled),
   onPetScaleChanged: (callback) => {
     const listener = (_, scale) => callback(scale);
     ipcRenderer.on("pet:scale-changed", listener);

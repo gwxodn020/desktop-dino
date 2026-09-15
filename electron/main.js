@@ -13,7 +13,8 @@ let emotionOverlayWindow;
 let settingsWindow;
 let emotionMenuCloseReason;
 let petScale = 1;
-let borderEnabled = true;
+let borderEnabled = false;
+let pettingMode = false;
 let petImageSize = { width: PET_SIZE, height: PET_SIZE };
 
 // 💡 드래그가 시작될 때의 창 위치를 기억할 변수를 선언합니다.
@@ -307,15 +308,17 @@ function createWindow() {
     if (!petWindow || !Number.isFinite(requestedScale)) return;
 
     petScale = Math.min(2, Math.max(0.5, Number(requestedScale)));
-    const { x, y } = petWindow.getBounds();
     const width = Math.max(1, Math.round(petImageSize.width * petScale) + FRAME_PADDING * 2);
     const height = Math.max(1, Math.round(petImageSize.height * petScale) + FRAME_PADDING * 2);
+    const { x, y, width: currentWidth, height: currentHeight } = petWindow.getBounds();
+    const centeredX = Math.round(x - (width - currentWidth) / 2);
+    const centeredY = Math.round(y - (height - currentHeight) / 2);
     isProgrammaticResize = true;
     try {
       petWindow.setMinimumSize(1, 1);
       petWindow.setMaximumSize(width, height);
       petWindow.setMinimumSize(width, height);
-      petWindow.setBounds({ x, y, width, height });
+      petWindow.setBounds({ x: centeredX, y: centeredY, width, height });
     } finally {
       isProgrammaticResize = false;
     }
@@ -327,6 +330,10 @@ function createWindow() {
     if (petWindow && !petWindow.isDestroyed()) {
       petWindow.webContents.send("pet:border-enabled-changed", borderEnabled);
     }
+  });
+
+  ipcMain.on("pet:set-petting-mode", (_, enabled) => {
+    pettingMode = Boolean(enabled);
   });
 
   const closeEmotionMenu = (reason) => {
