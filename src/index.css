@@ -16,6 +16,13 @@ body:has(.emotion-overlay),
   height: 400px;
 }
 
+html:has(.settings-window),
+body:has(.settings-window),
+#root:has(.settings-window) {
+  width: 400px;
+  height: 280px;
+}
+
 /* 펫 컨테이너 div */
 .pet {
   cursor: grab;
@@ -69,14 +76,98 @@ body:has(.emotion-overlay),
   cursor: pointer;
 }
 
+.settings-window {
+  box-sizing: border-box;
+  width: 400px;
+  height: 280px;
+  padding: 30px;
+  color: #28263a;
+  background: #fffaf2;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.settings-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 48px;
+}
+
+.settings-titlebar h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.settings-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #6e687b;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-close:hover {
+  background: #f2e8dc;
+}
+
+.scale-setting {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  font-size: 15px;
+}
+
+.scale-setting output {
+  color: #d4584e;
+  font-weight: 700;
+}
+
+.scale-setting input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: #d4584e;
+  cursor: pointer;
+}
+
+.border-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 26px;
+  font-size: 15px;
+}
+
+.border-setting input {
+  width: 18px;
+  height: 18px;
+  accent-color: #d4584e;
+  cursor: pointer;
+}
+
 .pet:active {
   cursor: grabbing;
 }
 
 img {
   display: block;
+  margin: 1px;
   object-fit: contain;
   image-rendering: pixelated;
+  filter:
+    drop-shadow(1px 0 0 white)
+    drop-shadow(-1px 0 0 white)
+    drop-shadow(0 1px 0 white)
+    drop-shadow(0 -1px 0 white);
   user-select: none;
   -webkit-user-drag: none;
+}
+
+.pet.no-border img {
+  filter: none;
 }

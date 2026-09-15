@@ -13,8 +13,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
   startDrag: (direction, cursorX, cursorY) => ipcRenderer.send("pet:start-drag", direction, cursorX, cursorY),
   resizePet: (width, height) => ipcRenderer.send("pet:resize", width, height),
   openEmotionMenu: () => ipcRenderer.send("pet:open-emotion-menu"),
+  openSettings: () => ipcRenderer.send("pet:open-settings"),
   selectEmotion: (emotion) => ipcRenderer.send("pet:select-emotion", emotion),
   closeEmotionMenu: (reason) => ipcRenderer.send("pet:close-emotion-menu", reason),
+  closeSettings: () => ipcRenderer.send("pet:close-settings"),
+  setPetScale: (scale) => ipcRenderer.send("pet:set-scale", scale),
+  setBorderEnabled: (enabled) => ipcRenderer.send("pet:set-border-enabled", enabled),
+  onPetScaleChanged: (callback) => {
+    const listener = (_, scale) => callback(scale);
+    ipcRenderer.on("pet:scale-changed", listener);
+    return () => ipcRenderer.removeListener("pet:scale-changed", listener);
+  },
+  onBorderEnabledChanged: (callback) => {
+    const listener = (_, enabled) => callback(enabled);
+    ipcRenderer.on("pet:border-enabled-changed", listener);
+    return () => ipcRenderer.removeListener("pet:border-enabled-changed", listener);
+  },
   onEmotionSelected: (callback) => {
     const listener = (_, emotion) => callback(emotion);
     ipcRenderer.on("pet:emotion-selected", listener);

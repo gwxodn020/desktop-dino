@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from "react";
 
 type AutoState = "idle" | "walk" | "fastrun" | "sleep" | "eating" | "work" | "roar";
 const isEmotionMenu = new URLSearchParams(window.location.search).get("window") === "emotion-menu";
+const isSettingsWindow = new URLSearchParams(window.location.search).get("window") === "settings";
 const emotions = [
   { value: "feed", label: "🍖", ariaLabel: "밥주기" },
   { value: "work", label: "💻", ariaLabel: "작업" },
   { value: "angry", label: "😡", ariaLabel: "감정 😡" },
   { value: "love", label: "❤️", ariaLabel: "❤️" },
+  { value: "settings", label: "⚙️", ariaLabel: "설정" },
 ];
 
 declare global {
@@ -20,12 +22,67 @@ declare global {
       autoMove: (deltaX: number) => void;
       onAutoBoundary: (callback: () => void) => () => void;
       openEmotionMenu: () => void;
+      openSettings: () => void;
       selectEmotion: (emotion: string) => void;
       closeEmotionMenu: (reason?: "cancel") => void;
+      closeSettings: () => void;
+      setPetScale: (scale: number) => void;
+      setBorderEnabled: (enabled: boolean) => void;
+      onPetScaleChanged: (callback: (scale: number) => void) => () => void;
+      onBorderEnabledChanged: (callback: (enabled: boolean) => void) => () => void;
       onEmotionSelected: (callback: (emotion: string) => void) => () => void;
       onEmotionMenuClosed: (callback: (reason?: "cancel") => void) => () => void;
     };
   }
+}
+
+function SettingsWindow() {
+  const initialScale = Number(new URLSearchParams(window.location.search).get("scale")) || 1;
+  const initialBorderEnabled = new URLSearchParams(window.location.search).get("border") !== "false";
+  const [scale, setScale] = useState(initialScale);
+  const [borderEnabled, setBorderEnabled] = useState(initialBorderEnabled);
+
+  const updateScale = (value: string) => {
+    const nextScale = Number(value);
+    setScale(nextScale);
+    window.electronAPI.setPetScale(nextScale);
+  };
+
+  const updateBorder = (enabled: boolean) => {
+    setBorderEnabled(enabled);
+    window.electronAPI.setBorderEnabled(enabled);
+  };
+
+  return (
+    <main className="settings-window" onContextMenu={(event) => event.preventDefault()}>
+      <div className="settings-titlebar">
+        <h1>공룡 설정</h1>
+        <button type="button" className="settings-close" onClick={() => window.electronAPI.closeSettings()} aria-label="닫기">
+          ×
+        </button>
+      </div>
+      <label className="scale-setting">
+        <span>공룡 크기</span>
+        <output>{Math.round(scale * 100)}%</output>
+        <input
+          type="range"
+          min="0.5"
+          max="2"
+          step="0.1"
+          value={scale}
+          onChange={(event) => updateScale(event.target.value)}
+        />
+      </label>
+      <label className="border-setting">
+        <span>공룡 테두리</span>
+        <input
+          type="checkbox"
+          checked={borderEnabled}
+          onChange={(event) => updateBorder(event.target.checked)}
+        />
+      </label>
+    </main>
+  );
 }
 
 function EmotionMenu() {
@@ -86,6 +143,9 @@ function Pet() {
   const [eatingFrame, setEatingFrame] = useState(0);
   const [workFrame, setWorkFrame] = useState(0);
   const [roarFrame, setRoarFrame] = useState(0);
+  const [petScale, setPetScale] = useState(1);
+  const [borderEnabled, setBorderEnabled] = useState(true);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const positionRef = useRef({ x: -1, y: -1 });
   const autoStateRef = useRef<AutoState>("idle");
   const isHoldingRef = useRef(false);
@@ -191,6 +251,14 @@ function Pet() {
 
     return removeBoundaryListener;
   }, [isEmotionMenuOpen]);
+
+  useEffect(() => {
+    return window.electronAPI.onPetScaleChanged(setPetScale);
+  }, []);
+
+  useEffect(() => {
+    return window.electronAPI.onBorderEnabledChanged(setBorderEnabled);
+  }, []);
 
   useEffect(() => {
     const removeSelectedListener = window.electronAPI.onEmotionSelected((emotion) => {
@@ -433,23 +501,31 @@ function Pet() {
       : `${import.meta.env.BASE_URL}pet/idle.png`;
   return (
     // 💡 .pet div 자체에 grab 커서가 먹히도록 설정 (CSS에서 세팅)
-    <div className="pet" onMouseDown={onPetMouseDown} onContextMenu={(e) => e.preventDefault()}>
+    <div className={`pet${borderEnabled ? "" : " no-border"}`} onMouseDown={onPetMouseDown} onContextMenu={(e) => e.preventDefault()}>
       <img
         src={sprite}
         alt="pet"
         draggable={false}
         onLoad={(event) => {
           const image = event.currentTarget;
+          setImageSize({ width: image.naturalWidth, height: image.naturalHeight });
           window.electronAPI.resizePet(image.naturalWidth, image.naturalHeight);
         }}
-        style={{ transform: `scaleX(${direction})`, pointerEvents: "none" }}
+        style={{
+          width: imageSize.width ? imageSize.width * petScale : undefined,
+          height: imageSize.height ? imageSize.height * petScale : undefined,
+          transform: `scaleX(${direction})`,
+          pointerEvents: "none",
+        }}
       />
     </div>
   );
 }
 
 function App() {
-  return isEmotionMenu ? <EmotionMenu /> : <Pet />;
+  if (isEmotionMenu) return <EmotionMenu />;
+  if (isSettingsWindow) return <SettingsWindow />;
+  return <Pet />;
 }
 
 export default App;

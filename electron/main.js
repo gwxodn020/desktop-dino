@@ -2,12 +2,19 @@ import { app, BrowserWindow, ipcMain, screen } from "electron";
 import { fileURLToPath } from "node:url";
 
 const PET_SIZE = 100;
+const FRAME_PADDING = 1;
 const TAIL_OFFSET_X = PET_SIZE / 2.7;
 const TAIL_OFFSET_Y = PET_SIZE * 0.05;
 const EMOTION_OVERLAY_SIZE = 400;
+const SETTINGS_WINDOW_WIDTH = 430;
+const SETTINGS_WINDOW_HEIGHT = 280;
 let petWindow;
 let emotionOverlayWindow;
+let settingsWindow;
 let emotionMenuCloseReason;
+let petScale = 1;
+let borderEnabled = true;
+let petImageSize = { width: PET_SIZE, height: PET_SIZE };
 
 // 💡 드래그가 시작될 때의 창 위치를 기억할 변수를 선언합니다.
 let startWindowX = 0;
@@ -40,6 +47,8 @@ function createWindow() {
       contextIsolation: true,
     },
   });
+  petWindow.setAlwaysOnTop(true, "floating");
+  petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   if (app.isPackaged) {
     petWindow.loadFile(fileURLToPath(new URL("../dist/index.html", import.meta.url)));
@@ -69,13 +78,17 @@ function createWindow() {
   ipcMain.on("pet:resize", (_, requestedWidth, requestedHeight) => {
     if (!petWindow || emotionOverlayWindow) return;
 
+    petImageSize = {
+      width: Math.max(1, Math.round(requestedWidth)),
+      height: Math.max(1, Math.round(requestedHeight)),
+    };
     console.log("[RESIZE]", {
       width: requestedWidth,
       height: requestedHeight,
       before: petWindow.getBounds(),
     });
-    const width = Math.max(1, Math.round(requestedWidth));
-    const height = Math.max(1, Math.round(requestedHeight));
+    const width = Math.max(1, Math.round(petImageSize.width * petScale) + FRAME_PADDING * 2);
+    const height = Math.max(1, Math.round(petImageSize.height * petScale) + FRAME_PADDING * 2);
     const { x, y, width: currentWidth, height: currentHeight } = petWindow.getBounds();
     const TOLERANCE = 2;
     if (
@@ -100,13 +113,15 @@ function createWindow() {
   ipcMain.on("pet:start-drag", (_, direction, cursorX, cursorY) => {
     if (!petWindow || emotionOverlayWindow) return;
     const { x, y, width: currentWidth, height: currentHeight } = petWindow.getBounds();
+    const tailOffsetX = FRAME_PADDING + TAIL_OFFSET_X * petScale;
+    const tailOffsetY = FRAME_PADDING + TAIL_OFFSET_Y * petScale;
     const tailOffsetFromWindow = direction === 1
-      ? TAIL_OFFSET_X
-      : currentWidth - TAIL_OFFSET_X;
+      ? tailOffsetX
+      : currentWidth - tailOffsetX;
     const display = screen.getDisplayNearestPoint({ x, y });
     const { x: minX, y: minY, width, height } = display.workArea;
     const targetX = cursorX - tailOffsetFromWindow;
-    const targetY = cursorY - TAIL_OFFSET_Y;
+    const targetY = cursorY - tailOffsetY;
     startWindowX = Math.min(Math.max(targetX, minX), minX + width - currentWidth);
     startWindowY = Math.min(Math.max(targetY, minY), minY + height - currentHeight);
     boundaryNotified = false;
@@ -196,14 +211,14 @@ function createWindow() {
     const { x, y, width: currentWidth, height: currentHeight } = petWindow.getBounds();
     const display = screen.getDisplayNearestPoint({ x: x + currentWidth / 2, y: y + currentHeight / 2 });
     const { x: minX, y: minY, width, height } = display.workArea;
-    const overlayX = Math.min(
+    const overlayX = Math.round(Math.min(
       Math.max(x + currentWidth / 2 - EMOTION_OVERLAY_SIZE / 2, minX),
       minX + width - EMOTION_OVERLAY_SIZE,
-    );
-    const overlayY = Math.min(
+    ));
+    const overlayY = Math.round(Math.min(
       Math.max(y + currentHeight / 2 - EMOTION_OVERLAY_SIZE / 2, minY),
       minY + height - EMOTION_OVERLAY_SIZE,
-    );
+    ));
     const preloadPath = fileURLToPath(new URL("preload.js", import.meta.url));
 
     emotionOverlayWindow = new BrowserWindow({
@@ -221,6 +236,7 @@ function createWindow() {
         contextIsolation: true,
       },
     });
+    emotionOverlayWindow.setPosition(overlayX, overlayY);
 
     const emotionMenuUrl = app.isPackaged
       ? `file://${fileURLToPath(new URL("../dist/index.html", import.meta.url))}?window=emotion-menu`
@@ -238,6 +254,81 @@ function createWindow() {
     });
   });
 
+  function openSettingsWindow() {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.focus();
+      return;
+    }
+
+    const { x, y, width, height } = petWindow.getBounds();
+    const display = screen.getDisplayNearestPoint({ x, y });
+    const { x: minX, y: minY, width: workWidth, height: workHeight } = display.workArea;
+    const settingsX = Math.round(Math.min(
+      Math.max(x + width / 2 - SETTINGS_WINDOW_WIDTH / 2, minX),
+      minX + workWidth - SETTINGS_WINDOW_WIDTH,
+    ));
+    const settingsY = Math.round(Math.min(
+      Math.max(y + height + 12, minY),
+      minY + workHeight - SETTINGS_WINDOW_HEIGHT,
+    ));
+    const preloadPath = fileURLToPath(new URL("preload.js", import.meta.url));
+    settingsWindow = new BrowserWindow({
+      width: SETTINGS_WINDOW_WIDTH,
+      height: SETTINGS_WINDOW_HEIGHT,
+      x: settingsX,
+      y: settingsY,
+      frame: false,
+      resizable: false,
+      alwaysOnTop: true,
+      webPreferences: {
+        preload: preloadPath,
+        contextIsolation: true,
+      },
+    });
+
+    const settingsUrl = app.isPackaged
+      ? `file://${fileURLToPath(new URL("../dist/index.html", import.meta.url))}?window=settings&scale=${petScale}&border=${borderEnabled}`
+      : `http://localhost:5173/?window=settings&scale=${petScale}&border=${borderEnabled}`;
+    settingsWindow.loadURL(settingsUrl);
+    settingsWindow.on("closed", () => {
+      settingsWindow = undefined;
+    });
+  }
+
+  ipcMain.on("pet:open-settings", () => {
+    openSettingsWindow();
+  });
+
+  ipcMain.on("pet:close-settings", () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
+  });
+
+  ipcMain.on("pet:set-scale", (_, requestedScale) => {
+    if (!petWindow || !Number.isFinite(requestedScale)) return;
+
+    petScale = Math.min(2, Math.max(0.5, Number(requestedScale)));
+    const { x, y } = petWindow.getBounds();
+    const width = Math.max(1, Math.round(petImageSize.width * petScale) + FRAME_PADDING * 2);
+    const height = Math.max(1, Math.round(petImageSize.height * petScale) + FRAME_PADDING * 2);
+    isProgrammaticResize = true;
+    try {
+      petWindow.setMinimumSize(1, 1);
+      petWindow.setMaximumSize(width, height);
+      petWindow.setMinimumSize(width, height);
+      petWindow.setBounds({ x, y, width, height });
+    } finally {
+      isProgrammaticResize = false;
+    }
+    petWindow.webContents.send("pet:scale-changed", petScale);
+  });
+
+  ipcMain.on("pet:set-border-enabled", (_, enabled) => {
+    borderEnabled = Boolean(enabled);
+    if (petWindow && !petWindow.isDestroyed()) {
+      petWindow.webContents.send("pet:border-enabled-changed", borderEnabled);
+    }
+  });
+
   const closeEmotionMenu = (reason) => {
     if (emotionOverlayWindow && !emotionOverlayWindow.isDestroyed()) {
       console.log("[CLOSE_EMOTION_SIGNAL] 메뉴 닫기 신호 수신됨");
@@ -251,6 +342,11 @@ function createWindow() {
 
   ipcMain.on("pet:close-emotion-menu", (_, reason) => closeEmotionMenu(reason));
   ipcMain.on("pet:select-emotion", (_, emotion) => {
+    if (emotion === "settings") {
+      closeEmotionMenu();
+      openSettingsWindow();
+      return;
+    }
     console.log(`[emotion] 선택됨: ${emotion}`);
     if (emotion === "💤") {
       console.log("[SLEEP_SIGNAL] sleep 기능 신호 수신됨");
