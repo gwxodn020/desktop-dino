@@ -63,17 +63,17 @@
         "AppImage",
         "pacman"
       ],
-      "icon": "public/pet/icon.png",
-      "pacman": {
-        "depends": [
-          "gtk3",
-          "libnotify",
-          "nss",
-          "libxss",
-          "libxtst",
-          "xdg-utils"
-        ]
-      }
+      "icon": "public/pet/icon.png"
+    },
+    "pacman": {
+      "depends": [
+        "gtk3",
+        "libnotify",
+        "nss",
+        "libxss",
+        "libxtst",
+        "xdg-utils"
+      ]
     }
   }
 }
