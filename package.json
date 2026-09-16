@@ -2,7 +2,7 @@
   "name": "trexpet",
   "main": "electron/main.js",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "author": {
     "name": "kimkikak",
     "email": "rlarlhak00719@gmail.com"
@@ -51,7 +51,8 @@
     ],
     "mac": {
       "target": "dmg",
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "gatekeeperAssess": false
     },
     "win": {
       "target": "nsis",
@@ -62,7 +63,17 @@
         "AppImage",
         "pacman"
       ],
-      "icon": "public/pet/icon.png"
+      "icon": "public/pet/icon.png",
+      "pacman": {
+        "depends": [
+          "gtk3",
+          "libnotify",
+          "nss",
+          "libxss",
+          "libxtst",
+          "xdg-utils"
+        ]
+      }
     }
   }
 }
