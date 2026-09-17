@@ -47,6 +47,10 @@
     "productName": "DeskPet",
     "compression": "maximum",
     "electronLanguages": ["ko", "en-US"],
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
+    },
     "files": [
       "dist/**/*",
       "electron/**/*"
