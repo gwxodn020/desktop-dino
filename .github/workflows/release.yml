@@ -27,10 +27,23 @@ jobs:
 
       - run: npm run build
 
-      - name: Build and publish
-        run: npx electron-builder --publish always
+      - name: Build
+        run: npx electron-builder --publish never
+
+      - name: Publish to GitHub release
+        uses: softprops/action-gh-release@v2
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: false
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.pacman
+            dist/*.blockmap
+            dist/latest*.yml
 
       - uses: actions/upload-artifact@v4
         with:
