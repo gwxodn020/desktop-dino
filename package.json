@@ -45,6 +45,8 @@
   "build": {
     "appId": "com.kimkikak.deskpet",
     "productName": "DeskPet",
+    "compression": "maximum",
+    "electronLanguages": ["ko", "en-US"],
     "files": [
       "dist/**/*",
       "electron/**/*"
@@ -63,7 +65,7 @@
         "AppImage",
         "pacman"
       ],
-      "icon": "public/pet/icon.png"
+      "icon": "build/icon.png"
     },
     "pacman": {
       "depends": [

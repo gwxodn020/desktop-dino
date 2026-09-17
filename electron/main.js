@@ -62,7 +62,9 @@ function createWindow() {
   }
 
   // DevTools는 분리된 창으로 띄운다 (투명 petWindow 안에 docked로 열면 레이아웃 꼬임)
-  //petWindow.webContents.openDevTools({ mode: "detach" });
+  if (!app.isPackaged) {
+    petWindow.webContents.openDevTools({ mode: "detach" });
+  }
 
   // 핵심: 어떤 이유로든 리사이즈 시도 자체를 원천 차단 + 로그로 원인 확인
   petWindow.on("will-resize", (event, newBounds) => {
