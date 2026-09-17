@@ -2,7 +2,7 @@
   "name": "trexpet",
   "main": "electron/main.js",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "author": {
     "name": "kimkikak",
     "email": "rlarlhak00719@gmail.com"
