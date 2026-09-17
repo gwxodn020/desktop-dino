@@ -2,7 +2,7 @@
   "name": "trexpet",
   "main": "electron/main.js",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": {
     "name": "kimkikak",
     "email": "rlarlhak00719@gmail.com"
@@ -54,7 +54,9 @@
     "mac": {
       "target": "dmg",
       "icon": "build/icon.icns",
-      "gatekeeperAssess": false
+      "forceCodeSigning": true,
+      "hardenedRuntime": true,
+      "notarize": true
     },
     "win": {
       "target": "nsis",

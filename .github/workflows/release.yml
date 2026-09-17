@@ -27,7 +27,30 @@ jobs:
 
       - run: npm run build
 
-      - name: Build
+      - name: Build macOS (sign and notarize)
+        if: matrix.os == 'macos-latest'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --publish never
+
+      - name: Verify macOS signature and notarization
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          find dist -type d -name 'DeskPet.app' -print0 | while IFS= read -r -d '' app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+          done
+          for dmg in dist/*.dmg; do
+            xcrun stapler validate "$dmg"
+          done
+
+      - name: Build Windows and Linux
+        if: matrix.os != 'macos-latest'
         run: npx electron-builder --publish never
 
       - name: Publish to GitHub release
